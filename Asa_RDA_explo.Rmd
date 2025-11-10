@@ -13,6 +13,16 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Data are collected on the long term on one lake (see description below). Nutriments (phosphorus, nitrate, biological oxygen demand) and biodiversity (phytoplanckton, primary production, fishes) are monitored each year.
 
+## Data origine 
+Journal of Applied Ecology 2014, 51, 560–571
+ doi: 10.1111/1365-2664.12245
+ The relevance of ecological status to ecosystem
+ functions and services in a large boreal lake
+ Kimmo T. Tolonen1*, Heikki H€ am€ al€ ainen1, Anssi Lensu1, Jarmo J. Meril€ ainen1,
+ Arja Palom€ aki2 and Juha Karjalainen1
+ 1Department of Biological and Environmental Science, University of Jyv€askyl€a, P.O.Box 35, Jyv€askyl€a FI-40014,
+ Finland; and 2Institute for Environmental Research, University of Jyv€askyl€a, P.O.Box 35, Jyv€askyl€a FI-40014, Finland
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
@@ -79,7 +89,10 @@ summary(nutriment$P_MWL)
 
 #### reflexion sur les données manquante 
 ```{r}
-# BCP de donnes manquante ? qu'est ce qu' on fait ? - on les retire dans une distribtuoion simmilaire
+# BCP de donnes manquante ? qu'est ce qu' on fait ? 
+# 1- on eleves les lignes avec des donnes manquantes
+# 2  in tire dans dans une distribtuoion simmilaire pour completer les donees 
+#--> deux options sont valides
 
 hist(nutriment[2:52,6])
 hist(nutriment[53:96,6]) # pour le deuxième cites valeur globlment les meme -> on peut faire hypothèse que pour le premier site aussi 
@@ -101,16 +114,21 @@ les donnes qui manque vont de l'annee 1960-1974  , ces données sont des X que l
 --> toute donnée avant 1975 
 
 ```{r}
-nutriment2=nutriment[16:95,]
+nutriment2=nutriment[16:95,] # Options 1 on ne conserver que les lignes ou les nutirments sont dispos : enlèves donnes avant 1975
+
+
+nutriment2=nutriment2[-37,] # supprime la ligne de l'année 2011 car donnees manquante 
+# bourillon pour cette étpa---
 #nutriment2=nutriment2[-nutriment2$year==2011,]
-#nutriment2$year==2011 identifier quelle lignes il y a en plus des données
-nutriment2=nutriment2[-37,]
+#nutriment2$year==2011 identifier quelle lignes il y a en plus des données---
 ```
 
 ## load Y Va 
 ```{r}
 bio=read.xlsx(file="data_lake.xlsx", sheetIndex = 3, header=T)
-bio=bio[-c(seq(118,134)),-c(9,8,7)]
+bio=bio[-c(seq(118,134)),-c(9,8,7)] # enlève les lignes et colones vides
+
+# redefinis informatiqument les donnees
 bio$Phytoplankton.richness=as.numeric(bio$Phytoplankton.richness)
 bio$Primary.production..g.C.m.2.=as.numeric(bio$Primary.production..g.C.m.2.)
 bio$Fish.catch..kg.gill.net.1.day.1.=as.numeric(bio$Fish.catch..kg.gill.net.1.day.1.)
