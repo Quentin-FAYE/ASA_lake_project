@@ -1,0 +1,350 @@
+---
+title: "Asa_data_explo_RDA"
+author: "QuentinFAYE"
+date: "2025-11-10"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data contexte 
+
+Data are collected on the long term on one lake (see description below). Nutriments (phosphorus, nitrate, biological oxygen demand) and biodiversity (phytoplanckton, primary production, fishes) are monitored each year.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Packages needed + data loading
+
+```{r}
+library(ade4)
+library(vegan)
+library("ggplot2")
+library("factoextra")
+library(corrplot)
+library(RVAideMemoire)
+library("PerformanceAnalytics")
+#library(GGally)
+library(MASS)
+library("xlsx")
+```
+
+## + data loading
+
+```{r}
+nutriment=read.xlsx(file="data_lake.xlsx", sheetIndex = 2,  )
+colnames(nutriment)=c("Year","Area","P_MWL","P_Ind_L", "P_O_L","N_MWL","N_Ind_L", "N_O_L","BOD_MWL","BOD_Ind_L", "BOD_O_L")
+nutriment=nutriment[-1,] # les deux premières lignes sont les unites + les headers, on renommes les header on doit donc s'assurer que il y'ai que les valeurs de nos variables
+nutriment$Area=as.factor(nutriment$Area) # les deux premières VA sont des categories
+nutriment$Year=as.factor(nutriment$Year)
+
+# "BOD_Other loading" a une seul valeur -> on surpprime la colonne 
+nutriment=nutriment[,-11]
+
+# donnes ne sont pas numerique ? mais des "character"
+class(nutriment$P_MWL)
+
+# on doit tout changer en numérique
+
+nutriment$P_MWL=gsub(',','.',nutriment$P_MWL)
+nutriment$P_MWL=scale(as.numeric(nutriment$P_MWL))
+
+nutriment$P_Ind_L=gsub(',','.',nutriment$P_Ind_L)
+nutriment$P_Ind_L=scale(as.numeric(nutriment$P_Ind_L))
+
+nutriment$P_O_L=gsub(',','.',nutriment$P_O_L)
+nutriment$P_O_L=scale(as.numeric(nutriment$P_O_L))
+
+nutriment$N_MWL=gsub(',','.',nutriment$N_MWL)
+nutriment$N_MWL=scale(as.numeric(nutriment$N_MWL))
+
+nutriment$N_Ind_L=gsub(',','.',nutriment$N_Ind_L)
+nutriment$N_Ind_L=scale(as.numeric(nutriment$N_Ind_L))
+
+nutriment$N_O_L=gsub(',','.',nutriment$N_O_L)
+nutriment$N_O_L=scale(as.numeric(nutriment$N_O_L))
+
+nutriment$BOD_MWL=gsub(',','.',nutriment$BOD_MWL)
+nutriment$BOD_MWL=scale(as.numeric(nutriment$BOD_MWL))
+
+nutriment$BOD_Ind_L=gsub(',','.',nutriment$BOD_Ind_L)
+nutriment$BOD_Ind_L=scale(as.numeric(nutriment$BOD_Ind_L))
+
+summary(nutriment$P_MWL)
+
+```
+
+#### reflexion sur les données manquante 
+```{r}
+# BCP de donnes manquante ? qu'est ce qu' on fait ? - on les retire dans une distribtuoion simmilaire
+
+hist(nutriment[2:52,6])
+hist(nutriment[53:96,6]) # pour le deuxième cites valeur globlment les meme -> on peut faire hypothèse que pour le premier site aussi 
+
+plot(y=nutriment[nutriment$Area=="Central Paijanne",6] , x=seq(1968, 2011)) # pas de tendance 
+
+plot(y=nutriment[nutriment$Area=="Northen Paijanne",6] , x=seq(1960, 2011)) # clair tendance -> on peut faire regression lineraire our obtenir valeur manuante + ajouter aletoir avec la variabilité 
+
+
+#hist( a[ !a==0 ])
+
+
+```
+
+le P nutriment est en Kg P / day et les autres sont en tonnes ? ->normaliser
+les donnes qui manque vont de l'annee 1960-1974  , ces données sont des X que l'on veut utilisé pour Y ( que Y soit phyto ou fish)  or les donnes de nos Y commence à l'annee 1975. C'etais donc un test
+
+
+--> toute donnée avant 1975 
+
+```{r}
+nutriment2=nutriment[16:95,]
+#nutriment2=nutriment2[-nutriment2$year==2011,]
+#nutriment2$year==2011 identifier quelle lignes il y a en plus des données
+nutriment2=nutriment2[-37,]
+```
+
+## load Y Va 
+```{r}
+bio=read.xlsx(file="data_lake.xlsx", sheetIndex = 3, header=T)
+bio=bio[-c(seq(118,134)),-c(9,8,7)]
+bio$Phytoplankton.richness=as.numeric(bio$Phytoplankton.richness)
+bio$Primary.production..g.C.m.2.=as.numeric(bio$Primary.production..g.C.m.2.)
+bio$Fish.catch..kg.gill.net.1.day.1.=as.numeric(bio$Fish.catch..kg.gill.net.1.day.1.)
+
+
+
+
+
+
+
+bio_moyennes <- bio %>%
+  group_by(Year, Area) %>%
+  summarise(
+    Phytoplankton.richness = mean(`Phytoplankton.richness`, na.rm = TRUE),
+    Primary.production..g.C.m.2. = mean(`Primary.production..g.C.m.2.`, na.rm = TRUE),
+    Fish.catch..kg.gill.net.1.day.1. = mean(`Fish.catch..kg.gill.net.1.day.1.`, na.rm = TRUE),
+    .groups = "drop"
+  )
+bio_moyennes<- na.omit(bio_moyennes) # retires les lignes ou il manque des valeurs
+
+
+# Normalisation 
+bio_moyennes$Phytoplankton.richness=scale(bio_moyennes$Phytoplankton.richness)
+bio_moyennes$Primary.production..g.C.m.2.=scale(bio_moyennes$Primary.production..g.C.m.2.)
+bio_moyennes$Fish.catch..kg.gill.net.1.day.1.=scale(bio_moyennes$Fish.catch..kg.gill.net.1.day.1.)
+
+summary(bio_moyennes$Fish.catch..kg.gill.net.1.day.1.)
+```
+
+## Data exploration 
+
+```{r}
+cor(nutriment2[,3:10])
+M <- cor(nutriment2[,3:10])
+corrplot(M, method = "circle")
+
+```
+ correltation important  P_MWL et BOD_Mwl = on retire BOD_MWL
+ correlation importante  P_O_L N_O_L = on retire P_O_L
+## ne pas tourner se chunck 
+ 
+```{r}
+# Charger les bibliothèques utiles
+library(dplyr)
+
+# Supposons que ton data.frame s'appelle 'bio'
+# Voici le script pour calculer les moyennes par année et par Area
+
+bio_moyennes <- bio %>%
+  group_by(Year, Area) %>%
+  summarise(
+    Phytoplankton.richness = mean(`Phytoplankton.richness`, na.rm = TRUE),
+    Primary.production..g.C.m.2. = mean(`Primary.production..g.C.m.2.`, na.rm = TRUE),
+    Fish.catch..kg.gill.net.1.day.1. = mean(`Fish.catch..kg.gill.net.1.day.1.`, na.rm = TRUE),
+    .groups = "drop"
+  )
+phyto_m=bio_moyennes[,1:3] # a ne pas avoir normaliser av 
+phyto_m$Year=as.factor(phyto_m$Year)
+phyto_m$Area=as.factor(phyto_m$Area)
+# Afficher le résultat
+head(bio_moyennes)
+#nut2_bio_m=cbind(bio_moyennes,nutriment2) # fusion a partir des anees
+
+nut2_bio_m <- merge(nutriment2,bio_moyennes, by=c("Year", "Area"), all = TRUE)
+
+nut2_bio_m[nut2_bio_m == "NaN"] <- NA
+
+
+cor(nut2_bio_m[,3:13])
+M <- cor(nut2_bio_m[,3:13],  use = "pairwise.complete.obs")
+corrplot(M, method = "circle")
+
+```
+ 
+forte correlation negative P_Ind_L et phytoplancton.
+##  co-inertia 1 - AFC/CA and PCA
+```{r}
+# pca ne doit pas avoir de na et peut pas utiliser des VA categorie
+bio_moyennes_complet <- na.omit(bio_moyennes)
+#pcasp <- dudi.pca(bio_moyennes_complet, scannf = FALSE, nf = 2) # peut pas utiliser des VA categorie
+pcaenv <- dudi.pca(nutriment2[,3:10],scannf=F,nf=2) # perd le lien avec les années
+#coi <- coinertia(pcaenv,coaphyto,scannf=F,nf=2) # equal row numbers is needed
+nutriment3_phyto<- merge(nutriment2, phyto_m, by = c("Year", "Area"))
+coaphyto <- dudi.coa(nutriment3_phyto[,c(1,2,11)],scannf=F,nf=2) 
+pcaenv <- dudi.pca(nutriment3_phyto[,3:10],row.w =coaphyto$lw,scannf=F,nf=2) # perd le lien avec les années
+
+
+coi <- coinertia(pcaenv,coaphyto,scannf=F,nf=2) 
+coi
+str(coi)
+randtest(coi,nrepet=1000)
+plot(randtest(coi),main="Monte-Carlo test")
+
+
+summary(coi)
+coi
+randtest(coi,nrepet=1000)
+plot(randtest(coi),main="Monte-Carlo test")
+```
+##  RDA PCA PCA avec vegan
+
+```{r}
+
+env_bio=merge(nutriment2,bio_moyennes,by = c("Year", "Area")) # permet d'avoir des tableau de meme taille
+
+# verification que donnes bien centréé reduites  meme apres la selec
+mean(env_bio$Phytoplankton.richness)
+
+# RDA avec toutes les VAs
+rda1=rda(env_bio[,11:13]~.,env_bio[,3:10])
+
+# RDA avec  les VA les plus pertinantes
+rda2=ordistep(rda1, perm.max=500)
+rda3=rda(env_bio[,11:13]~env_bio$P_MWL+env_bio$N_MWL+env_bio$BOD_Ind_L,env_bio[,3:10])
+
+# visualtion 
+plot(rda1, scaling=2)
+plot(rda3,scaling=2) 
+plot(rda2,scaling=2) 
+
+summary(rda2)
+
+test=vif.cca(rda2)   # inflaction de la variance ? 
+test
+
+plot(rda3,scaling=2, display = "sp" ) ; plot(rda3, scaling=2)
+plot(rda3,scaling=1, display = "sp" ) 
+
+#scores()
+anova.cca(rda3)
+vif.cca(rda3) # all inferior of 10 so -> ok
+
+anova(rda3)
+anova(rda3, by="term", model="direct", data=env_bio[,c(3,6,10)], perm.max=10000 , step=1000) # ne valide pas interet P_MWL
+
+anova(rda3, by="term", model="direct", data=env_bio[,3:10], perm.max=10000 , step=1000) # ne valide pas interet P_MWL
+
+anova(rda3 , by="margin") # valide tout, quelle est la diferrences
+anova(rda3, by="axis") # ne valide que axis 1 
+
+MVA.synt(rda3) # interpreter
+coef(rda3) # pas comment sont represent ? comment faire la transformation d'axe ? 
+MVA.plot(rda3,"corr",space=1)#constrained PCA interpretation ? tailles des fless pas du tout les memes et dans le plan Rd3 c'est l'inverse, bio tres proche du centre et env flèche plus grande ? 
+goodness(rda3) # different des coef
+```
+# partial RDA avec temps ? 
+# scaling 1 devitnion ? 
+ scaling = 2: preserve correlations between descriptors. Interesting if we are interested in the relation among variables.
+plot(rdadoubs,scaling=1)  # scaling = 1: preserve euclidian distances between observations
+
+
+## to do 
+#Partition The Variation Of Community Matrix By 2, 3, Or 4 Explanatory Matrices
+
+
+
+```{r}
+
+
+
+# quelle des VA environnemtale explique le mieux la variances de la comunnaute de bio 
+# regarder toutes à la fois
+mod=varpart(env_bio[,11:13], env_bio$P_MWL, env_bio$N_MWL, env_bio$BOD_Ind_L)
+mod # comment interpreter ? 
+plot(mod, bg=2:5)
+
+# ou regarder une par une 
+
+rda_PWL=rda(env_bio[,11:13], env_bio$P_MWL)
+rda_PWL  # comment interpreter ?  # comment on interpprète cela ??? quelle eingevalue est d 'interet ? 
+
+```
+
+
+
+#calculate with ADE4 the percentage of species explained by env:
+sum(pcaivdoubs$eig)/sum(pcafau$eig)
+### avec ADE4
+
+```{r}
+pca_bio=dudi.pca(env_bio[,11:13], scale = F , nf=2, scannf = F)
+pcai_env=pcaiv(pca_bio, env_bio[,3:10], scannf = F , nf=2)
+pcai_env
+
+summary(pcai_env)
+plot(pcai_env)
+sum(pcai_env$eig/sum(pca_bio$eig)) #  de bio expliqué par l' environnement 
+
+#test the analysis:
+randtest(pcai_env)#with ADE4 # o-value assez elevé pas ouf
+plot(randtest(pcai_env))
+
+
+
+```
+
+INTrepreter ? Total unconstrained inertia (pca_bio): 2.906, seul 10% est contrzinte alors ? pk 29.62 % est expliqué ?
+Inertia of pca_bio explained by env_bio[, 3:10] (%): 29.62 ?? d 'ou sort ce 29.62
+
+Interpreter ? 
+Decomposition per axis:
+   iner inercum inerC inercumC ratio    R2 lambda
+1 1.271    1.27 1.236     1.24 0.973 0.529  0.654
+2 0.905    2.18 0.936     2.17 0.998 0.137  0.128
+
+
+
+
+## A faire est a interpreter ? 
+
+#now calculate the contributions by hand
+contrib1=100*pcaivdoubs$cw*pcaivdoubs$co[,1]^2/pcaivdoubs$eig[1]
+contrib2=100*pcaivdoubs$cw*pcaivdoubs$co[,2]^2/pcaivdoubs$eig[2]
+contrib1
+contrib2
+
+#ask for column absolute contributions
+inertia.dudi(pcaivdoubs, col = TRUE, row = TRUE)
+
+#ask for the contributions of the variables:
+pcaivdoubs$cor
+s.corcircle(pcaivdoubs$cor)
+pcaivdoubs$l1
+pcaivdoubs$c1
+s.corcircle(pcaivdoubs$c1)
+pcaivdoubs$fa
+s.match(pcaivdoubs$ls, pcaivdoubs$li)
+
+#find the canonical coefficient (i.e.the equivalent of regression coefficients for each explanatory variable on each canonical axis)
+coef(rdadoubs)
+
+
+
+#Choice of linear (RDA) or unimodal (CCA) model ?
+#perform a DCA to decide whether the RDA or the CCA is best suited to the data set:
+#The first coinertia is also better because it uses the weights of the CA for the fish data, which gives more importance to the stations with more species.
+
