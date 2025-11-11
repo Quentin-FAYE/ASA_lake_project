@@ -58,7 +58,7 @@ nutriment=nutriment[,-11]
 # donnes ne sont pas numerique ? mais des "character"
 class(nutriment$P_MWL)
 
-# on doit tout changer en numérique
+# on doit tout changer en numérique + noramliser 
 
 nutriment$P_MWL=gsub(',','.',nutriment$P_MWL)
 nutriment$P_MWL=scale(as.numeric(nutriment$P_MWL))
@@ -114,6 +114,7 @@ les donnes qui manque vont de l'annee 1960-1974  , ces données sont des X que l
 
 --> toute donnée avant 1975 
 
+## VA X pre-traitement suppresion des lignes avec des data manquantes
 ```{r}
 nutriment2=nutriment[16:95,] # Options 1 on ne conserver que les lignes ou les nutirments sont dispos : enlèves donnes avant 1975
 
@@ -238,7 +239,6 @@ plot(randtest(coi),main="Monte-Carlo test")
 ##  RDA PCA PCA avec vegan : Respecter les chunck à ne pas runer !! 
 
 ```{r}
-
 env_bio=merge(nutriment2,bio_moyennes,by = c("Year", "Area")) # permet d'avoir des tableau de meme taille
 
 # verification que donnes bien centréé reduites  meme apres la selec
@@ -254,37 +254,77 @@ rda3=rda(env_bio[,11:13]~env_bio$P_MWL+env_bio$N_MWL+env_bio$BOD_Ind_L,env_bio[,
 # visualtion 
 plot(rda1, scaling=2)
 plot(rda3,scaling=2) 
-plot(rda2,scaling=2) 
+plot(rda2,scaling=2)
 
+# faire un code pour ne pas avoir les lignes 
+```
+# scaling 1 devitnion ? 
+ scaling = 2: preserve correlations between descriptors. Interesting if we are interested in the relation among variables.
+plot(rdadoubs,scaling=1)  # scaling = 1: preserve euclidian distances between observations
+
+```{r}
 summary(rda2)
+anova.cca(rda3) #tt le modèle avec test de permutations
+#anova(rda3) # meme cote
 
-test=vif.cca(rda2)   # inflaction de la variance ? 
+```
+25% de variance des mesures de fonctionnalites et de diversite de l'ecosystme sont expliqués par la ravilaite enregsitré dans dans les variables explicative ! Dont 21% dans le premiers Axe.
+L' anova sur tout le modèle montre que le modèle creer est signifactivment meilleur que le modèle Nul, des liens entres le tableaux X et Y ont été identifé signifivaticment. 
+Les autres axes ne sont pas signifiactive, on ne doit pas les utiliser dans l' interpretation. 
+
+#### validation du modèle RDA et inerpretation 
+```{r}
+
+anova(rda3, by="term", model="direct", data=env_bio[,c(3,6,10)], perm.max=10000 , step=1000) # ne valide pas interet P_MWL 
+anova(rda3 , by="margin") # valide tout, quelle est la diferrences
+```
+deux Analyse de la variances différentes une valide toutes les VA X expllicatives l'autres n'en conserve que deux 
+
+BY TERM : anova(..., by="term") / anova(..., by="axis") (Sequential Test)
+
+How it works: Variables are added to the model one at a time, in the order they are specified in the formula. The significance test for each term measures the additional variance it explains, given the variables that were entered before it.
+
+BY margin : 
+he significance of each variable is tested by seeing how much the model fit worsens when that specific variable is removed from the full model. It measures the unique contribution of each variable, after accounting for all other variables in the model.
+
+INterpretation DONC 
+Anova by term ->le modèle seul avec P_MWL n' pas suffisament de vairavilté mais quand on rajoute les autres VA N_MWL et BIO_INd 
+anova by margin -> chaque VA est interesante dans le modèle car en enlvever une diminus signifiactivment la vairavlité contraintre expliqué par le moddèle
+
+#### RDA validation de chaque AXE
+```{r}
+anova(rda3, by="axis") # ne valide que axis 1 
+MVA.synt(rda3) # interpreter
+```
+Ne conserver que le premier Axe, ce qui portaient le maximume de contraintres expliqueé 21% les autres axes ne doivent donc pas etre utilisé pour l'interpretation. 
+dans l'axe 1 on retrouve 84% de l'information contrainte capté par le modèle.
+
+```{r}
+test=vif.cca(rda2)   # inflaction de la variance ?
+vif.cca(rda3) # all inferior of 10 so -> ok
 test
 
-plot(rda3,scaling=2, display = "sp" ) ; plot(rda3, scaling=2)
-plot(rda3,scaling=1, display = "sp" ) 
+# plot d 'exploration, pas tres interessant grafiquemr, mettre  sp et Va envir sur meme graph 
+plot(rda3,scaling=2, display = "sp" )
+plot(rda3, scaling=2)
+plot(rda3,scaling=1, display = "sp" )
+```
 
+La VIF aassociée à chaque est bien en dessous de 5 et meme de 3 il n'y a paq de probèle de ce coté. pas 'inflation de la variaciance à cause de colinearité hypothehtique
+```{r}
+s.corcircle()
+```
+
+
+```{r}
 #scores()
-anova.cca(rda3)
-vif.cca(rda3) # all inferior of 10 so -> ok
 
-anova(rda3)
-anova(rda3, by="term", model="direct", data=env_bio[,c(3,6,10)], perm.max=10000 , step=1000) # ne valide pas interet P_MWL
-
-anova(rda3, by="term", model="direct", data=env_bio[,3:10], perm.max=10000 , step=1000) # ne valide pas interet P_MWL
-
-anova(rda3 , by="margin") # valide tout, quelle est la diferrences
-anova(rda3, by="axis") # ne valide que axis 1 
-
-MVA.synt(rda3) # interpreter
 coef(rda3) # pas comment sont represent ? comment faire la transformation d'axe ? 
 MVA.plot(rda3,"corr",space=1)#constrained PCA interpretation ? tailles des fless pas du tout les memes et dans le plan Rd3 c'est l'inverse, bio tres proche du centre et env flèche plus grande ? 
 goodness(rda3) # different des coef
 ```
 # partial RDA avec temps ? 
-# scaling 1 devitnion ? 
- scaling = 2: preserve correlations between descriptors. Interesting if we are interested in the relation among variables.
-plot(rdadoubs,scaling=1)  # scaling = 1: preserve euclidian distances between observations
+
 
 
 ## to do 
@@ -293,7 +333,7 @@ plot(rdadoubs,scaling=1)  # scaling = 1: preserve euclidian distances between ob
 
 
 ```{r}
-
+# interpretation ICI 
 
 
 # quelle des VA environnemtale explique le mieux la variances de la comunnaute de bio 
@@ -318,22 +358,56 @@ sum(pcaivdoubs$eig)/sum(pcafau$eig)
 ```{r}
 pca_bio=dudi.pca(env_bio[,11:13], scale = F , nf=2, scannf = F)
 pcai_env=pcaiv(pca_bio, env_bio[,3:10], scannf = F , nf=2)
-pcai_env
 
-summary(pcai_env)
-plot(pcai_env)
-sum(pcai_env$eig/sum(pca_bio$eig)) #  de bio expliqué par l' environnement 
-
-#test the analysis:
 randtest(pcai_env)#with ADE4 # o-value assez elevé pas ouf
 plot(randtest(pcai_env))
+#modèle on significatif car on a  mis touts les VA explicative# 
+# recommencer avec les VA selectionées avec VEGAN
+
+pcai_env2=pcaiv(pca_bio,env_bio[,c(3,6,10)], scannf = F , nf=2)
+randtest(pcai_env2)#with ADE4 # o-value assez elevé pas ouf
+plot(randtest(pcai_env2))
+
+# le modèle avec les bonnes VA  est singficaviemtn different d 'une modèle issue d'une mixtes randome.
+```
 
 
+
+
+
+```{r}
+
+summary(pcai_env2)
+plot(pcai_env2)
+sum(pcai_env2$eig/sum(pca_bio$eig)) #  de bio expliqué par l' environnement 
 
 ```
 
-INTrepreter ? Total unconstrained inertia (pca_bio): 2.906, seul 10% est contrzinte alors ? pk 29.62 % est expliqué ?
-Inertia of pca_bio explained by env_bio[, 3:10] (%): 29.62 ?? d 'ou sort ce 29.62
+On retrouve la meme chose aque avec les stats de Vegan , CAD 
+- 25% de la variabilité
+- 84% de la varaiabilitz capté du modèle est contenue dans l'axe 1 
+
+ligne 17 semble tres importants ? trop importantes ? 
+```{r}
+boxplot(env_bio$Primary.production..g.C.m.2.)
+# le point ici est probablement un out-layer 
+# refaire l'analyse ? 
+
+
+pca_bio=dudi.pca(env_bio[-17,11:13], scale = F , nf=2, scannf = F)
+pcai_env2=pcaiv(pca_bio,env_bio[-17,c(3,6,10)], scannf = F , nf=2)
+plot(pcai_env2)
+summary(pcai_env2)
+
+```
+modèle meilleur 29% de la vairabilit' expliqué.-> tout refaire 
+
+jsp ce que c'est ca.
+```{r}
+randtest(discrimin(pca_bio, env_bio$Area, scan = FALSE), 99) # jsp pas à quoi ça sert 
+```
+
+
 
 Interpreter ? 
 Decomposition per axis:
@@ -342,6 +416,14 @@ Decomposition per axis:
 2 0.905    2.18 0.936     2.17 0.998 0.137  0.128
 
 
+```{r}
+s.corcircle(pcai_env2$cor)
+s.corcircle(pcai_env2$c1)
+# ce qui est interessant c'est les deux ensemble ? 
+
+s.match(pcai_env2$ls, pcai_env2$li) # comment in entreprète cela 
+
+```
 
 
 ## A faire est a interpreter ? 
@@ -355,14 +437,6 @@ contrib2
 #ask for column absolute contributions
 inertia.dudi(pcaivdoubs, col = TRUE, row = TRUE)
 
-#ask for the contributions of the variables:
-pcaivdoubs$cor
-s.corcircle(pcaivdoubs$cor)
-pcaivdoubs$l1
-pcaivdoubs$c1
-s.corcircle(pcaivdoubs$c1)
-pcaivdoubs$fa
-s.match(pcaivdoubs$ls, pcaivdoubs$li)
 
 #find the canonical coefficient (i.e.the equivalent of regression coefficients for each explanatory variable on each canonical axis)
 coef(rdadoubs)
@@ -372,4 +446,11 @@ coef(rdadoubs)
 #Choice of linear (RDA) or unimodal (CCA) model ?
 #perform a DCA to decide whether the RDA or the CCA is best suited to the data set:
 #The first coinertia is also better because it uses the weights of the CA for the fish data, which gives more importance to the stations with more species.
+
+
+# Interpretation  neet to be done 
+one the same graphe : Env et bio pour tirer des conclusions avec go
+```{r}
+goodness(rda3)
+```
 
