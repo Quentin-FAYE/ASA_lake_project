@@ -236,6 +236,9 @@ coi
 randtest(coi,nrepet=1000)
 plot(randtest(coi),main="Monte-Carlo test")
 ```
+
+# justification de RDA et pas CCA ou pas COinertie
+
 ##  RDA PCA PCA avec vegan : Respecter les chunck à ne pas runer !! 
 
 ```{r}
