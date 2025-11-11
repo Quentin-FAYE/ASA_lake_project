@@ -40,9 +40,10 @@ library("PerformanceAnalytics")
 #library(GGally)
 library(MASS)
 library("xlsx")
+library(dplyr)
 ```
 
-## + data loading
+## + X data loading
 
 ```{r}
 nutriment=read.xlsx(file="data_lake.xlsx", sheetIndex = 2,  )
@@ -87,7 +88,7 @@ summary(nutriment$P_MWL)
 
 ```
 
-#### reflexion sur les données manquante 
+#### reflexion sur les données manquante des Va X
 ```{r}
 # BCP de donnes manquante ? qu'est ce qu' on fait ? 
 # 1- on eleves les lignes avec des donnes manquantes
@@ -135,10 +136,6 @@ bio$Fish.catch..kg.gill.net.1.day.1.=as.numeric(bio$Fish.catch..kg.gill.net.1.da
 
 
 
-
-
-
-
 bio_moyennes <- bio %>%
   group_by(Year, Area) %>%
   summarise(
@@ -155,7 +152,7 @@ bio_moyennes$Phytoplankton.richness=scale(bio_moyennes$Phytoplankton.richness)
 bio_moyennes$Primary.production..g.C.m.2.=scale(bio_moyennes$Primary.production..g.C.m.2.)
 bio_moyennes$Fish.catch..kg.gill.net.1.day.1.=scale(bio_moyennes$Fish.catch..kg.gill.net.1.day.1.)
 
-summary(bio_moyennes$Fish.catch..kg.gill.net.1.day.1.)
+summary(bio_moyennes$Fish.catch..kg.gill.net.1.day.1.) # verification que la noramalisationa eu lieu
 ```
 
 ## Data exploration 
@@ -171,8 +168,15 @@ corrplot(M, method = "circle")
 ## ne pas tourner se chunck 
  
 ```{r}
-# Charger les bibliothèques utiles
-library(dplyr)
+bio=read.xlsx(file="data_lake.xlsx", sheetIndex = 3, header=T)
+bio=bio[-c(seq(118,134)),-c(9,8,7)] # enlève les lignes et colones vides
+
+# redefinis informatiqument les donnees
+bio$Phytoplankton.richness=as.numeric(bio$Phytoplankton.richness)
+bio$Primary.production..g.C.m.2.=as.numeric(bio$Primary.production..g.C.m.2.)
+bio$Fish.catch..kg.gill.net.1.day.1.=as.numeric(bio$Fish.catch..kg.gill.net.1.day.1.)
+
+
 
 # Supposons que ton data.frame s'appelle 'bio'
 # Voici le script pour calculer les moyennes par année et par Area
@@ -185,6 +189,9 @@ bio_moyennes <- bio %>%
     Fish.catch..kg.gill.net.1.day.1. = mean(`Fish.catch..kg.gill.net.1.day.1.`, na.rm = TRUE),
     .groups = "drop"
   )
+
+bio_moyennes<- na.omit(bio_moyennes) # retires les lignes ou il manque des valeurs
+
 phyto_m=bio_moyennes[,1:3] # a ne pas avoir normaliser av 
 phyto_m$Year=as.factor(phyto_m$Year)
 phyto_m$Area=as.factor(phyto_m$Area)
@@ -204,7 +211,7 @@ corrplot(M, method = "circle")
 ```
  
 forte correlation negative P_Ind_L et phytoplancton.
-##  co-inertia 1 - AFC/CA and PCA
+##  co-inertia 1 - AFC/CA and PCA expolration ne pas run le chunck 
 ```{r}
 # pca ne doit pas avoir de na et peut pas utiliser des VA categorie
 bio_moyennes_complet <- na.omit(bio_moyennes)
@@ -228,7 +235,7 @@ coi
 randtest(coi,nrepet=1000)
 plot(randtest(coi),main="Monte-Carlo test")
 ```
-##  RDA PCA PCA avec vegan
+##  RDA PCA PCA avec vegan : Respecter les chunck à ne pas runer !! 
 
 ```{r}
 
