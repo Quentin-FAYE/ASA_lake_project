@@ -238,6 +238,10 @@ plot(randtest(coi),main="Monte-Carlo test")
 ```
 
 # justification de RDA et pas CCA ou pas COinertie
+tableau des X -> VA continues 
+tableau des Y -> VA qualite + comptage ( semie quanti) + VA continue
+si on ne conserve que comptage + Va Continue on a deux tableau de VA continue/semi- quantitative
+aussi nous voulons contraindre l'analyse on pense que les donnees environemtale explique les donnes des fonctionalité et de diversité de l' ecosystème 
 
 ##  RDA PCA PCA avec vegan : Respecter les chunck à ne pas runer !! 
 
@@ -430,6 +434,12 @@ s.match(pcai_env2$ls, pcai_env2$li) # comment in entreprète cela
 
 
 ## A faire est a interpreter ? 
+$ls Ces scores de site sont ainsi des combinaisons linéaires d'abondances d'espèces maximisant la variance expliquée par les variables environnementales
+Les valeurs ajustées de ces scores, prédites par les variables environnementales, sont contenues dans $li
+Les résidus du modèle global espèces-environnement sont représentés par des flèches (chaque site est représenté par une flèche, le point de départ correspondant à son score environnemental ajusté et la pointe à sa composition). Une flèche courte indique une
+bonne concordance entre la composition spécifique d'un site et sa prédiction par les
+conditions environnementales, tandis qu'une flèche longue indique une divergence.
+se sont donc les residues entres concodrande envrionemtale et composisiotn qui sont representé ??
 
 #now calculate the contributions by hand
 contrib1=100*pcaivdoubs$cw*pcaivdoubs$co[,1]^2/pcaivdoubs$eig[1]
@@ -451,7 +461,7 @@ coef(rdadoubs)
 #The first coinertia is also better because it uses the weights of the CA for the fish data, which gives more importance to the stations with more species.
 
 
-# Interpretation  neet to be done 
+# Interpretation  neet to be done | NMDS ?
 one the same graphe : Env et bio pour tirer des conclusions avec go
 ```{r}
 goodness(rda3)
