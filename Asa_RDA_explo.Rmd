@@ -88,7 +88,7 @@ summary(nutriment$P_MWL)
 ```
 
 #### reflexion sur les données manquante des Va X
-```{r}
+------------brouillon -----------------------------
 # BCP de donnes manquante ? qu'est ce qu' on fait ? 
 # 1- on eleves les lignes avec des donnes manquantes
 # 2  in tire dans dans une distribtuoion simmilaire pour completer les donees 
@@ -105,13 +105,16 @@ plot(y=nutriment[nutriment$Area=="Northen Paijanne",6] , x=seq(1960, 2011)) # cl
 #hist( a[ !a==0 ])
 
 
-```
 
 le P nutriment est en Kg P / day et les autres sont en tonnes ? ->normaliser
 les donnes qui manque vont de l'annee 1960-1974  , ces données sont des X que l'on veut utilisé pour Y ( que Y soit phyto ou fish)  or les donnes de nos Y commence à l'annee 1975. C'etais donc un test
 
 
---> toute donnée avant 1975 
+--> toute donnée qui manque sont  avant 1975  et donc ca nous intersse pas de les completer car les donnes de bio/ espcèes commence à partri de 195=75
+----------------------------------------------------------------
+
+
+
 
 ## VA X pre-traitement suppresion des lignes avec des data manquantes
 ```{r}
@@ -135,7 +138,45 @@ bio$Primary.production..g.C.m.2.=as.numeric(bio$Primary.production..g.C.m.2.)
 bio$Fish.catch..kg.gill.net.1.day.1.=as.numeric(bio$Fish.catch..kg.gill.net.1.day.1.)
 
 
+```
+### remplire les annees qui manque
+# hypothèses , justification : si un case vide on perds l'informations de la lignes , donc on perd un indivs statistiquz , si une case Na on perd l'info su les autres cases de la lignes 
 
+# on souhaite donc remplir le tableau sans rajouter trop d 'information  
+# on regarde l evoluation des ses variables en foncttion du temps et on fait un regression en fonction du temps + bruit gaussion et on complète le tableau comme cela
+# pk on peut se mettre de faie cela, car on exploita pas la relations  entres les variables et le temps dans la RDA donc si on inferes les valeurs menquante en fonction du temps , on ajoute bien des infromations qu'une seul fois,  rapport a si on predisait les valeurs manquat à partir d 'une variable utilis" dans la RDA,  cela creerais un lien artificiel entres les la VA predite et la VA explicative, 
+
+```{r}
+##-----------------------fish catch pour chaque sous basin
+
+plot(x=bio[1:23,1] , # temps
+     y=bio[1:23,6] )
+# -> relation linéar bof mais toujouts meilleur que prendre la mooyennes 
+x=bio[1:23,1]  # temps
+     y=bio[1:23,6] # fish catsh
+Poro=lm(y~x)
+summary(Poro) # 2 coef signficiativ -> valide le modèle 
+
+#for which years data is missing
+missing_years=c()
+for (i in 1:23) {
+  #print(i) # " verif"
+  if (is.na( bio[i,6]))  { missing_years=c(missing_years,i)  }
+  
+}
+#missing_years # verif
+
+predicted_values <- predict(Poro, newdata = data.frame(x = bio[missing_years, 1])) 
+bruit=  rnorm(n=length(missing_years), mean = 0, sd=sd(bio[1:23,6],na.rm = T) )
+predicted_values=predicted_values+bruit
+
+bio_filled=bio
+bio_filled[missing_years,6]=predicted_values
+
+```
+
+
+```{r}
 bio_moyennes <- bio %>%
   group_by(Year, Area) %>%
   summarise(
@@ -443,6 +484,124 @@ Les résidus du modèle global espèces-environnement sont représentés par des
 bonne concordance entre la composition spécifique d'un site et sa prédiction par les
 conditions environnementales, tandis qu'une flèche longue indique une divergence.
 se sont donc les residues entres concodrande envrionemtale et composisiotn qui sont representé ??
+
+
+# RDA represtation 
+```{r}
+# Charger la bibliothèque # Partie de code faire avec Claude Sonnet 4.5 
+# car temps limité + pas bcp d 'expreience avec ggplot2 
+# bidouiller ensuite manuellement pour adapter le code 
+library(ggplot2)
+
+
+# Exemple de données (remplacez par vos données)
+# data(doubs) # Exemple de dataset ade4
+
+#env_bio[-17,11:13], scale = F , nf=2, scannf = F)
+#pcai_env2=pcaiv(pca_bio,env_bio[-17,c(3,6,10)]
+
+env <-  env_bio[-17,c(3,6,10)]
+spe <- env_bio[-17,11:13]
+
+# Supposons que vous avez déjà fait une RDA avec pcaiv()
+ rda_result <- pcai_env2 #=pcaiv(dudi.pca(spe, scannf = FALSE), env, scannf = FALSE)
+
+# FONCTION POUR CRÉER LE TRIPLOT COMPLET
+plot_rda_triplot <- function(rda_obj, axes = c(1, 2), 
+                              scaling = 1,
+                              arrow_col_sites = "blue",
+                              arrow_col_env = "red", 
+                              arrow_col_spe = "darkgreen",
+                              mult_env = 1,
+                              mult_spe = 1) {
+  
+  # Extraire les coordonnées
+  # Sites (scores)
+  sites_lc <- rda_obj$li[, axes]  # Valeurs prédites (contraintes)
+  sites_ls <- rda_obj$ls[, axes]  # Valeurs observées
+  
+  # Variables environnementales (loadings)
+  env_scores <- rda_obj$c1[, axes] * mult_env
+  
+  # Espèces (loadings)
+  spe_scores <- rda_obj$co[, axes] * mult_spe
+  
+   # Définir les limites du graphique
+  # Combiner sans tenir compte des noms de colonnes
+  all_x <- c(sites_lc[, 1], sites_ls[, 1], env_scores[, 1], spe_scores[, 1])
+  all_y <- c(sites_lc[, 2], sites_ls[, 2], env_scores[, 2], spe_scores[, 2])
+  xlim <- range(all_x) * 1.2
+  ylim <- range(all_y) * 1.2
+  # Créer le graphique vide
+  plot(0, 0, type = "n", 
+       xlim = xlim, ylim = ylim,
+       xlab = paste0("Axe ", axes[1], " (", 
+                     round(rda_obj$eig[axes[1]]/sum(rda_obj$eig)*100, 1), "%)"),
+       ylab = paste0("Axe ", axes[2], " (", 
+                     round(rda_obj$eig[axes[2]]/sum(rda_obj$eig)*100, 1), "%)"),
+       main = "Triplot RDA - Sites, Variables environnementales et Espèces",
+       las = 1)
+  
+  # Ajouter la grille
+  abline(h = 0, v = 0, lty = 2, col = "gray60")
+  
+  # 1) FLÈCHES SITES: valeurs observées -> valeurs prédites
+  arrows(sites_ls[, 1], sites_ls[, 2],
+         sites_lc[, 1], sites_lc[, 2],
+         length = 0.08, col = arrow_col_sites, lwd = 1.5)
+  
+  # Points pour les sites observés et prédits
+  points(sites_ls[, 1], sites_ls[, 2], pch = 21, 
+         bg = "lightblue", col = "blue", cex = 1.2)
+  points(sites_lc[, 1], sites_lc[, 2], pch = 21, 
+         bg = "blue", col = "blue", cex = 1.2)
+  
+  # Labels des sites (optionnel)
+  text(sites_lc[, 1], sites_lc[, 2], labels = rownames(sites_lc),
+       pos = 3, cex = 0.6, col = "blue")
+  
+  # 2) FLÈCHES VARIABLES ENVIRONNEMENTALES
+  arrows(0, 0, env_scores[, 1], env_scores[, 2],
+         length = 0.1, col = arrow_col_env, lwd = 2.5)
+  
+  # Labels des variables environnementales
+  text(env_scores[, 1], env_scores[, 2], 
+       labels = rownames(env_scores),
+       pos = 4, cex = 0.8, col = arrow_col_env, font = 2)
+  
+  # 3) FLÈCHES ESPÈCES/VARIABLES BIOLOGIQUES
+  arrows(0, 0, spe_scores[, 1], spe_scores[, 2],
+         length = 0.08, col = arrow_col_spe, lwd = 1.5)
+  
+  # Labels des espèces
+  text(spe_scores[, 1], spe_scores[, 2], 
+       labels = rownames(spe_scores),
+       pos = 4, cex = 0.7, col = arrow_col_spe)
+  
+  # Légende
+  legend("bottomleft", 
+         legend = c("Sites observés", "Sites prédits", 
+                    "Var. environnementales", "Espèces"),
+         col = c("blue", "blue", arrow_col_env, arrow_col_spe),
+         pch = c(21, 21, NA, NA),
+         pt.bg = c("lightblue", "blue", NA, NA),
+         lty = c(NA, NA, 1, 1),
+         lwd = c(NA, NA, 2.5, 1.5),
+         cex = 0.8, bty = "n")
+}
+
+
+plot_rda_triplot(rda_result, 
+                 axes = c(1, 2),
+                 arrow_col_sites = "steelblue",
+                 arrow_col_env = "red3",
+                 arrow_col_spe = "forestgreen",
+                 mult_env = 2,
+                 mult_spe = 1.5  )
+```
+
+```
+
 
 #now calculate the contributions by hand
 contrib1=100*pcaivdoubs$cw*pcaivdoubs$co[,1]^2/pcaivdoubs$eig[1]
