@@ -1,0 +1,353 @@
+---
+title: "GLm_"
+author: "QuentinFAYE"
+date: "2025-11-16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# CODE Phyto
+
+
+
+```{r}
+library(knitr)
+#opts_chunk$set(echo = FALSE, comment = "", cache = TRUE, fig.align = "center")
+library(ggplot2) # graph package
+library(tinytex) # Pour la sortie pdf
+library(corrplot)# Correlation matrix calculus
+library(plot3D)# For 3D plot
+library(DHARMa)# Model diagnosis
+#library(rcompanion)# Model pseudo R²
+library(lattice)# multipanel graphics
+library(nlme)# Mixed models
+library(predictmeans)#Cook distance in mixed models
+library(dplyr)
+library(tidyverse)
+library(car)
+library(TSA)
+```
+
+
+```{r}
+# Dataset import
+nutrients = read.csv("data_lake_nutrients.csv",header=TRUE,sep=";",dec = ",",na.strings="",stringsAsFactors = TRUE)
+biotic = read.csv("data_lake_biotic.csv",header=TRUE,sep=";",dec = ",",na.strings="",stringsAsFactors = TRUE)
+biotic = biotic[1:117,1:6]
+nutrients$Year <-as.factor(nutrients$Year)
+nutrients$Area <-as.factor(nutrients$Area)
+biotic$Year <-as.factor(biotic$Year)
+biotic$Area <-as.factor(biotic$Area)
+biotic$Sub.basin = as.factor(biotic$Sub.basin)
+biotic = as.data.frame(biotic)
+nutrients = as.data.frame(nutrients)
+
+
+lake = biotic %>% inner_join(y = nutrients, by = c("Year","Area")) %>% 
+  select(-Primary.production..g.C.m.2.) %>% 
+  select(-Fish.catch..kg.gill.net.1.day.1.)
+```
+
+
+```{r}
+# Looking for missing values
+colSums(is.na(lake))
+
+# Removing missing values
+lake = lake[complete.cases(lake),]
+colSums(is.na(lake))
+```
+
+
+```{r}
+### Y analysis
+
+par(mfrow=c(2,2))
+# Boxplot
+boxplot(lake$Phytoplankton.richness,col='dodgerblue3',ylab='Phytoplankton richness')
+# Cleveland plot
+dotchart(lake$Phytoplankton.richness,pch=16,col='dodgerblue3',xlab='Phytoplankton richness')
+# Histogram
+hist(lake$Phytoplankton.richness,col='dodgerblue3',xlab="Phytoplankton richness",main="")
+# Quantile-Quantile plot
+qqnorm(lake$Phytoplankton.richness,pch=16,col='dodgerblue3',xlab='')
+qqline(lake$Phytoplankton.richness,col='red')
+```
+
+
+```{r}
+### Quantitative X analysis 
+
+par(mfrow=c(4,3))
+
+# Length
+# Cleveland plot
+dotchart(lake$P.Municipal.wastewater.loading,pch=16,col='blue',xlab='P Wastewater loading')
+# Histogram
+hist(lake$P.Municipal.wastewater.loading,col='blue',xlab="Length",main="")
+# Quantile-Quantile plot
+qqnorm(dataFly$Length,pch=16,col='blue',xlab='')
+qqline(dataFly$Length,col='red')
+```
+
+
+
+### Qualitative X analysis
+
+### Analyser la relation potentielle entre Y vs Xs
+
+
+
+```{r}
+par(mfrow=c(1,2))
+# Atmospheric conditions
+plot(lake$Phytoplankton.richness~lake$Area,pch=16,col='dodgerblue3',xlab='Area',ylab='Phytoplankton richness')
+
+# Period
+boxplot(lake$Phytoplankton.richness~lake$Year, varwidth = TRUE, ylab = "Phytoplankton richness", xlab = "Year", col='darkgrey', main = "")
+```
+### Time series visualization
+
+
+```{r}
+tablake<- lake %>%
+  group_by(Year) %>% 
+  summarise(Phytoplankton.richness=mean(Phytoplankton.richness))
+tablake
+
+plot(as.numeric(tablake$Year),tablake$Phytoplankton.richness, xlab="year", ylab="Phytoplankton richness")
+lines(as.numeric(tablake$Year),tablake$Phytoplankton.richness)
+
+acf(tablake$Phytoplankton.richness, main="Phytoplankton richness")
+pacf(tablake$Phytoplankton.richness, main="Phytoplankton richness")
+
+
+tablake2<- lake %>%
+  group_by(Area,Year) %>% 
+  summarise(Phytoplankton.richness=mean(Phytoplankton.richness)) %>% 
+  arrange(Year)
+tablake2
+
+
+North = tablake2[tablake2$Area=="Northen Paijanne",]
+Central = tablake2[tablake2$Area=="Central Paijanne",]
+
+par(mfrow=c(1,2),mar=c(2,4,2.5,0),oma=c(2,2,2,2)) 
+acf(North$Phytoplankton.richness, main="Phytoplankton richness for Northern Paijanne")
+acf(Central$Phytoplankton.richness, main="Phytoplankton richness for Central Paijanne")
+
+
+tablake3<- lake %>%
+  group_by(Sub.basin,Year) %>% 
+  summarise(Phytoplankton.richness=mean(Phytoplankton.richness)) %>% 
+  arrange(Year)
+tablake3
+```
+
+
+```{r}
+##Splitting the dataset into different datasets for each Sub.basin
+Judin = tablake3[tablake3$Sub.basin=="Judinsalonselkä",]
+Lehti = tablake3[tablake3$Sub.basin=="Lehtiselkä",]
+Poron = tablake3[tablake3$Sub.basin=="Poronselkä",]
+Ristin = tablake3[tablake3$Sub.basin=="Ristinselkä",]
+Tiirin = tablake3[tablake3$Sub.basin=="Tiirinselkä",]
+Vanhan = tablake3[tablake3$Sub.basin=="Vanhanselkä",]
+
+par(mfrow=c(3,2),mar=c(2,4,2.5,0),oma=c(2,2,2,2)) 
+# the function "par" allow specify the criteria of the plotting area
+# the argument "mfrow" allows plotting multiple plots together (here we specified 2 rows
+#               and 3 columns, which means that we can plot up to 6 figures together)
+#the argument "mar" is to specify the space you want around each plot
+# the argument "oma" is used to plot the over legend "parameter for colony", it specifies space
+#               around the plots
+
+plot(as.numeric(Judin$Year),Judin$Phytoplankton.richness, xlab="year", ylab="Phytoplankton richness")
+lines(as.numeric(Judin$Year),Judin$Phytoplankton.richness)
+
+plot(as.numeric(Lehti$Year),Lehti$Phytoplankton.richness, xlab="year", ylab="Phytoplankton richness")
+lines(as.numeric(Lehti$Year),Lehti$Phytoplankton.richness)
+#line= this argument allows shifting a bit the position of the text.
+
+plot(as.numeric(Poron$Year),Poron$Phytoplankton.richness, xlab="year", ylab="Phytoplankton richness")
+lines(as.numeric(Poron$Year),Poron$Phytoplankton.richness)
+
+plot(as.numeric(Ristin$Year),Ristin$Phytoplankton.richness, xlab="year", ylab="Phytoplankton richness")
+lines(as.numeric(Ristin$Year),Ristin$Phytoplankton.richness)
+
+plot(as.numeric(Tiirin$Year),Tiirin$Phytoplankton.richness, xlab="year", ylab="Phytoplankton richness")
+lines(as.numeric(Tiirin$Year),Tiirin$Phytoplankton.richness)
+
+plot(as.numeric(Vanhan$Year),Vanhan$Phytoplankton.richness, xlab="year", ylab="Phytoplankton richness")
+lines(as.numeric(Vanhan$Year),Vanhan$Phytoplankton.richness)
+```
+
+
+```{r}
+### Temporal autocorrelation
+
+par(mfrow=c(3,2),mar=c(1,4,4,0))
+acf(Judin$Phytoplankton.richness, main="Phytoplankton richness for Judin lake")
+acf(Lehti$Phytoplankton.richness, main="Phytoplankton richness for Lehti lake")
+acf(Poron$Phytoplankton.richness, main="Phytoplankton richness for Poron lake")
+acf(Ristin$Phytoplankton.richness, main="Phytoplankton richness for Ristin lake")
+acf(Tiirin$Phytoplankton.richness, main="Phytoplankton richness for Tiirin lake")
+acf(Vanhan$Phytoplankton.richness, main="Phytoplankton richness for Vanhan lake")
+
+```
+
+### Modelling
+
+```{r}
+modglsARMA=lme(Phytoplankton.richness~ Area+P.Municipal.wastewater.loading+P.Industrial.loading+Other.P.loading+N.Municipal.wastewater.loading+N.Industrial.loading+as.numeric(Year), data=lake, correlation = corARMA(0.75,form = ~as.numeric(Year)|Sub.basin, p=1, q=0),random=~1|Sub.basin)
+summary(modglsARMA)
+
+modglsARMA2 = lme(Phytoplankton.richness~N.Industrial.loading+as.numeric(Year), data=lake, correlation = corARMA(0.75,form = ~as.numeric(Year)|Sub.basin, p=1, q=0),random=~1|Sub.basin)
+summary(modglsARMA2)
+plot(modglsARMA2$residuals[,1]~as.numeric(lake$Year))
+acf(modglsARMA2$residuals)
+pacf(modglsARMA2$residuals)
+
+modglsARMA5 = lme(Phytoplankton.richness~N.Industrial.loading+as.numeric(Year), data=lake, correlation = corARMA(0.75,form = ~as.numeric(Year)|Sub.basin, p=1, q=0),random=~1|Sub.basin)
+
+
+## On a besoin de q = 1 
+modglsARMA3 = lme(Phytoplankton.richness~N.Industrial.loading+as.numeric(Year), data=lake, correlation = corARMA(c(0.75,0.75),form = ~as.numeric(Year)|Sub.basin, p=1, q=1),random=~1|Sub.basin)
+summary(modglsARMA3)
+acf(modglsARMA3$residuals)
+
+modglsARMA4 = lme(Phytoplankton.richness~N.Industrial.loading+as.numeric(Year), data=lake, correlation = corARMA(c(0.75,0.75,0.75),form = ~as.numeric(Year)|Sub.basin, p=1, q=2),random=~1|Sub.basin)
+summary(modglsARMA4)
+acf(modglsARMA3$residuals)
+pacf(modglsARMA3$residuals)
+
+## ARMA2 est le meilleur en AIC
+```
+#CODE Fish
+
+
+```{r}
+library(knitr)
+library(ggplot2) # graph package
+library(tinytex) # Pour la sortie pdf
+library(corrplot)# Correlation matrix calculus
+library(plot3D)# For 3D plot
+library(DHARMa)# Model diagnosis
+library(rcompanion)# Model pseudo R²
+library(lattice)# multipanel graphics
+library(nlme)# Mixed models
+library(predictmeans)#Cook distance in mixed models
+library(dplyr)
+library(tidyverse)
+library(car)
+library(TSA)
+```
+
+
+```{r}
+# Dataset import
+nutrients = read.csv("data_lake_nutrients.csv",header=TRUE,sep=";",dec = ",",na.strings="",stringsAsFactors = TRUE)
+biotic = read.csv("data_lake_biotic.csv",header=TRUE,sep=";",dec = ",",na.strings="",stringsAsFactors = TRUE)
+biotic = biotic[1:117,1:6]
+nutrients$Year <-as.factor(nutrients$Year)
+nutrients$Area <-as.factor(nutrients$Area)
+biotic$Year <-as.factor(biotic$Year)
+biotic$Area <-as.factor(biotic$Area)
+biotic$Sub.basin = as.factor(biotic$Sub.basin)
+biotic = as.data.frame(biotic)
+nutrients = as.data.frame(nutrients)
+
+
+lake = biotic %>% inner_join(y = nutrients, by = c("Year","Area")) %>% 
+  select(-Primary.production..g.C.m.2.)
+```
+
+
+```{r}
+# Looking for missing values
+colSums(is.na(lake))
+
+# Removing missing values
+lake = lake[complete.cases(lake),]
+colSums(is.na(lake))
+
+## We remove colinear variables
+
+lake = lake %>% 
+  select(-BOD..Municipal.wastewater.loading) %>% 
+  select(-BOD.Industrial.loading) %>% 
+  select(-N.Other.loading)
+```
+
+
+```{r}
+### Y analysis
+
+par(mfrow=c(2,2))
+# Boxplot
+boxplot(lake$fish,col='dodgerblue3',ylab='Fish production')
+# Cleveland plot
+dotchart(lake$fish,pch=16,col='dodgerblue3',xlab='Fish production')
+# Histogram
+hist(lake$fish,col='dodgerblue3',xlab="Fish production",main="")
+# Quantile-Quantile plot
+qqnorm(lake$fish,pch=16,col='dodgerblue3',xlab='')
+qqline(lake$fish,col='red')
+
+
+
+### Time series visualization
+
+lake = lake %>% 
+  mutate(fish = Fish.catch..kg.gill.net.1.day.1.)
+
+tablake<- lake %>%
+  group_by(Year) %>% 
+  summarise(fish=mean(Fish.catch..kg.gill.net.1.day.1.))
+tablake
+
+plot(as.numeric(as.character(tablake$Year)),tablake$fish, xlab="year", ylab="Fish production")
+lines(as.numeric(as.character(tablake$Year)),tablake$fish)
+
+acf(tablake$fish, main="Fish production")
+pacf(tablake$fish, main="Fish production")
+
+## No temporal autocorrelation a priori
+
+
+### Modelling
+
+modlme=lme(fish ~ Area+P.Municipal.wastewater.loading+P.Industrial.loading+Other.P.loading+N.Municipal.wastewater.loading+N.Industrial.loading+as.numeric(Year), data=lake, random=~1|Year/Sub.basin)
+
+
+# Mixed model not able to handle the temporal aspect because the only significative effect is time
+
+
+par(mfrow=c(1,2))
+# Histogram
+hist(modlm$residuals,col='blue',xlab="residuals",main="Check Normality")
+# Quantile-Quantile plot
+qqnorm(modlm$residuals,pch=16,col='blue',xlab='')
+qqline(modlm$residuals,col='red')
+
+par(mfrow=c(1,2))
+
+# residuals vs fitted
+plot(residuals(modlm)~fitted(modlm)
+     , col='blue'
+     , pch=16
+     , ylab = "Residuals"
+     , xlab = "Fitted data")
+abline(h = 0)
+
+
+
+
+
+
+```
+
